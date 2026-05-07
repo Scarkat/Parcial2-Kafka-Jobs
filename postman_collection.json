@@ -1,0 +1,195 @@
+{
+	"info": {
+		"_postman_id": "d0e1f2a3-b4c5-4d6e-8f9g-0h1i2j3k4l5m",
+		"name": "Donna Summer - Kafka Flow Test",
+		"description": "Colección para probar todos los flujos de Kafka a través del API Gateway (puerto 8082).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Flujo Principal (Éxito)",
+			"item": [
+				{
+					"name": "Crear Orden (Events: Status & Inventory)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"codigoOrden\": \"{{orderCode}}\",\r\n  \"usuarioCorreo\": \"{{userEmail}}\",\r\n  \"productos\": [\r\n    {\r\n      \"nombre\": \"Laptop Gamer\",\r\n      \"precio\": 1500.50,\r\n      \"cantidad\": 1\r\n    }\r\n  ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ordenes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"ordenes"
+							]
+						},
+						"description": "Dispara los tópicos: 'order_status_changed_events' e 'inventory_update_events'."
+					},
+					"response": []
+				},
+				{
+					"name": "Procesar Pago (Event: Payment Received)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ordenid\": \"{{orderCode}}\",\r\n  \"fecha\": \"{{$isoTimestamp}}\",\r\n  \"cantidadPago\": 1500.50\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/pagos/procesar",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"pagos",
+								"procesar"
+							]
+						},
+						"description": "Dispara el tópico: 'payment_received_events'."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Flujo de Errores (Retry Topics)",
+			"item": [
+				{
+					"name": "Simular Fallo de Producto (Topic: productos-topico)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"id\": \"PROD-ERR-{{$randomInt}}\",\r\n  \"nombre\": \"Producto Defectuoso\",\r\n  \"error\": \"Fallo de validación en almacén\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/productos/fail",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"productos",
+								"fail"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Simular Fallo de Orden (Topic: ordenes-topico)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"codigoOrden\": \"{{orderCode}}\",\r\n  \"usuarioCorreo\": \"{{userEmail}}\",\r\n  \"error\": \"Stock insuficiente detectado asíncronamente\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/ordenes/fail",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"ordenes",
+								"fail"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Simular Fallo de Pago (Topic: pagos-topico)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ordenid\": \"{{orderCode}}\",\r\n  \"cantidadPago\": 1500.50,\r\n  \"error\": \"Fondos insuficientes en pasarela\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/pagos/fail",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"pagos",
+								"fail"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.test(\"Status code is 2xx or 500\", function () {",
+					"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 500]);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8082",
+			"type": "string"
+		},
+		{
+			"key": "userEmail",
+			"value": "test@ejemplo.com",
+			"type": "string"
+		},
+		{
+			"key": "orderCode",
+			"value": "ORD-12345",
+			"type": "string"
+		}
+	]
+}

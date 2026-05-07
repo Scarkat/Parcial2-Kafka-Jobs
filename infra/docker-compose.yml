@@ -1,0 +1,137 @@
+services:
+  eureka-server:
+    build:
+      context: ../services/eureka-server
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+
+  gateway:
+    build:
+      context: ../apiservice
+      dockerfile: Dockerfile
+    container_name: apiservice
+    ports:
+      - "8082:8080"
+    depends_on:
+      - eureka-server
+      - productoservice
+      - ordernservice
+      - pagoservice
+
+  productoservice:
+    build:
+      context: ../services/productoservice
+      dockerfile: Dockerfile
+    container_name: productoservice
+    expose:
+      - "8080"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - eureka-server
+
+  ordernservice:
+    build:
+      context: ../services/ordernservice
+      dockerfile: Dockerfile
+    container_name: ordernservice
+    expose:
+      - "8080"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - eureka-server
+
+  pagoservice:
+    build:
+      context: ../services/pagoservice
+      dockerfile: Dockerfile
+    container_name: pagoservice
+    expose:
+      - "8080"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      - eureka-server
+
+  querie:
+    build:
+      context: ../querie
+      dockerfile: Dockerfile
+    container_name: querie
+    ports:
+      - "8088:8088"
+    environment:
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres_retry_service:5432/failed_products_db
+      - ORDER_SERVICE_URL=http://apiservice:8080/ordenes
+      - PAYMENT_SERVICE_URL=http://apiservice:8080/pagos/procesar
+      - PRODUCT_SERVICE_URL=http://apiservice:8080/productos
+    depends_on:
+      - eureka-server
+      - zookeeper
+      - kafka
+    networks:
+      - default
+      - backend-network
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # INTERNAL es para tus microservicios en Docker, EXTERNAL para ti si te conectas por fuera
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui-web
+    depends_on:
+      - kafka
+    ports:
+      - "8085:8080" # <-- Lo movimos al 8085 para evitar choques con Spring Boot
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:29092
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
+
+networks:
+  backend-network:
+    external: true
+    name: postgres_backend-network

@@ -1,3 +1,7 @@
+include:
+  - ../postgres/docker-compose.yml
+  - ../cloudwatch/docker-compose.yml
+
 services:
   eureka-server:
     build:
@@ -6,6 +10,8 @@ services:
     container_name: eureka-server
     ports:
       - "8761:8761"
+    networks:
+      - backend-network
 
   gateway:
     build:
@@ -19,6 +25,8 @@ services:
       - productoservice
       - ordernservice
       - pagoservice
+    networks:
+      - backend-network
 
   productoservice:
     build:
@@ -31,6 +39,8 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     depends_on:
       - eureka-server
+    networks:
+      - backend-network
 
   ordernservice:
     build:
@@ -43,6 +53,8 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     depends_on:
       - eureka-server
+    networks:
+      - backend-network
 
   pagoservice:
     build:
@@ -55,6 +67,8 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     depends_on:
       - eureka-server
+    networks:
+      - backend-network
 
   querie:
     build:
@@ -73,8 +87,8 @@ services:
       - eureka-server
       - zookeeper
       - kafka
+      - postgres-db
     networks:
-      - default
       - backend-network
   
   zookeeper:
@@ -85,6 +99,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    networks:
+      - backend-network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -105,6 +121,8 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - backend-network
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -116,6 +134,8 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local-kafka
       KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - backend-network
 
   mongodb:
     image: mongo:latest
@@ -127,11 +147,8 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=admin123
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - backend-network
 
 volumes:
   mongodb_data:
-
-networks:
-  backend-network:
-    external: true
-    name: postgres_backend-network
